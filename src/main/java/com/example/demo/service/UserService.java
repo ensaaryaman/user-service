@@ -1,8 +1,13 @@
 package com.example.demo.service;
 
 import com.example.demo.model.User;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +21,30 @@ public class UserService {
 
     // Thread-safe id sayacı; ilk incrementAndGet() -> 1
     private final AtomicLong counter = new AtomicLong();
+
+    // Spring'in hazır kurduğu Jackson dönüştürücüsü (JSON <-> nesne)
+    private final ObjectMapper objectMapper;
+
+    public UserService(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
+    // Uygulama açılınca bir kez çalışır: mock-users.json'u okuyup listeye yükler
+    @PostConstruct
+    public void loadMockData() throws IOException {
+        ClassPathResource resource = new ClassPathResource("mock-users.json");
+        List<User> mockUsers = objectMapper.readValue(
+                resource.getInputStream(),
+                new TypeReference<List<User>>() {});
+        users.addAll(mockUsers);
+
+        // Sayacı yüklenen en büyük id'ye ayarla ki sonraki POST çakışmasın
+        long maxId = mockUsers.stream()
+                .mapToLong(User::getId)
+                .max()
+                .orElse(0);
+        counter.set(maxId);
+    }
 
     // Tüm kullanıcıları döndür
     public List<User> findAll() {
